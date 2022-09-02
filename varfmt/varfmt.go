@@ -63,7 +63,7 @@ func (v *varfmtAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
 	for _, fn := range prog.SrcFuncs {
 		if tfun, ok := fn.Object().(*types.Func); ok {
 			var fmtParam *ssa.Parameter
-			if printers.Kind(tfun) != printf.KindNone {
+			if k := printers.Kind(tfun); k != printf.KindNone && k != printf.KindPrint {
 				if len(fn.Params) >= 2 {
 					fmtParam = fn.Params[len(fn.Params)-2]
 				}
@@ -73,7 +73,7 @@ func (v *varfmtAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
 					if call, ok := inst.(ssa.CallInstruction); ok {
 						com := call.Common()
 						if com.IsInvoke() {
-							pass.Reportf(com.Pos(), "invoke")
+							// pass.Reportf(com.Pos(), "invoke")
 						} else {
 							callee := com.StaticCallee()
 							if callee == nil {
@@ -81,7 +81,7 @@ func (v *varfmtAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
 							}
 
 							if tfun, ok := callee.Object().(*types.Func); ok {
-								if printers.Kind(tfun) == printf.KindNone {
+								if k := printers.Kind(tfun); k == printf.KindNone || k == printf.KindPrint {
 									continue
 								}
 								if len(com.Args) < 2 {
