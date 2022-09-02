@@ -18,13 +18,16 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-const doc = `varfmt reports variables passed as format strings in printf-like functions
+const (
+	maxSourceWidth = 60
+	doc            = `varfmt reports variables passed as format strings in printf-like functions
 
 While this isn't necessarily a problem, and sometimes is very intentional,
 accidental use of potentially unvetted strings can result in ugly tokens like
 %!x(MISSING) showing up in the middle of your formatted strings. Varfmt reports
 all uses of variables as format strings, except those that are merely pass-
 throughs in a wrapper of a printf-like function.`
+)
 
 type varfmtAnalyzer struct {
 	*analysis.Analyzer
@@ -72,65 +75,61 @@ func (v *varfmtAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
 				for _, inst := range blk.Instrs {
 					if call, ok := inst.(ssa.CallInstruction); ok {
 						com := call.Common()
-						if com.IsInvoke() {
-							// pass.Reportf(com.Pos(), "invoke")
-						} else {
-							callee := com.StaticCallee()
-							if callee == nil {
-								continue
-							}
-
-							if tfun, ok := callee.Object().(*types.Func); ok {
-								if k := printers.Kind(tfun); k == printf.KindNone || k == printf.KindPrint {
-									continue
-								}
-								if len(com.Args) < 2 {
-									continue
-								}
-
-								msg := "non-constant expression"
-
-								fmtarg := com.Args[len(com.Args)-2]
-								switch v := fmtarg.(type) {
-								case *ssa.Const:
-									continue // Constants are fine
-								case *ssa.Slice:
-									if _, ok := v.X.(*ssa.Const); ok {
-										continue // Slices of const strings are ok
-									}
-								case *ssa.Parameter:
-									if v == fmtParam {
-										continue // pass-through format params are ok.
-									}
-								}
-
-								var n ast.Node
-								for _, f := range pass.Files {
-									if f.Pos() <= call.Pos() && f.End() >= call.Pos() {
-										path, _ := astutil.PathEnclosingInterval(f, call.Pos(), call.Pos())
-										for _, p := range path {
-											if c, ok := p.(*ast.CallExpr); ok {
-												if len(c.Args) < len(com.Args)-2 {
-													break
-												}
-												n = c.Args[len(com.Args)-2]
-											}
-										}
-									}
-								}
-
-								m := fmt.Sprintf("variable `%s`", pp(n))
-								if len(m) < 2*len(msg) {
-									msg = m
-								}
-
-								name := tfun.FullName()
-								if tfun.Pkg() == pass.Pkg {
-									name = strings.TrimPrefix(name, pass.Pkg.Name()+".")
-								}
-								pass.Reportf(call.Pos(), "%s used for %s format parameter", msg, name)
+						tfun := com.Method
+						if tfun == nil {
+							if callee := com.StaticCallee(); callee != nil {
+								tfun, _ = callee.Object().(*types.Func)
 							}
 						}
+						if tfun == nil {
+							continue
+						}
+						if k := printers.Kind(tfun); k == printf.KindNone || k == printf.KindPrint {
+							continue
+						}
+						if len(com.Args) < 2 {
+							continue
+						}
+
+						fmtarg := com.Args[len(com.Args)-2]
+						switch v := fmtarg.(type) {
+						case *ssa.Const:
+							continue // Constants are fine
+						case *ssa.Slice:
+							if _, ok := v.X.(*ssa.Const); ok {
+								continue // Slices of const strings are ok
+							}
+						case *ssa.Parameter:
+							if v == fmtParam {
+								continue // pass-through format params are ok.
+							}
+						}
+
+						var n ast.Node
+						for _, f := range pass.Files {
+							if f.Pos() <= call.Pos() && f.End() >= call.Pos() {
+								path, _ := astutil.PathEnclosingInterval(f, call.Pos(), call.Pos())
+								for _, p := range path {
+									if c, ok := p.(*ast.CallExpr); ok {
+										if len(c.Args) < len(com.Args)-2 {
+											break
+										}
+										n = c.Args[len(com.Args)-2]
+									}
+								}
+							}
+						}
+
+						msg := fmt.Sprintf("variable `%s`", pp(n))
+						if len(msg) > maxSourceWidth {
+							msg = "non-constant expression"
+						}
+
+						name := tfun.FullName()
+						if tfun.Pkg() == pass.Pkg {
+							name = strings.TrimPrefix(name, pass.Pkg.Name()+".")
+						}
+						pass.Reportf(call.Pos(), "%s used for %s format parameter", msg, name)
 					}
 				}
 			}
