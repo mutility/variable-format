@@ -10,6 +10,8 @@ However, if you're trying to track down in a large codebase where `%!x(MISSING)`
 is coming from, this analyzer can help you find it.
 esults are flaws.
 
+[![CI](https://github.com/mutility/variable-format/actions/workflows/build.yaml/badge.svg)](https://github.com/mutility/variable-format/actions/workflows/build.yaml)
+
 ## Example messages
 
 Given the following source code `example.go`:
