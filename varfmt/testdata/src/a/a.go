@@ -22,26 +22,31 @@ const (
 )
 
 func bad() {
-	// note: plusses, square brackets, other regex chars replaced with .
-
 	fmt.Sprintf(v1)           // want "variable `v1` used for fmt.Sprintf format parameter"
-	passthrough(v1 + v2)      // want "variable `v1 . v2` used for passthrough format parameter"
-	fmt.Sprintf(v1 + v2 + v3) // want "variable `v1 . v2 . v3` used for fmt.Sprintf format parameter"
-	fmt.Sprintf(v1 + c1)      // want "variable `v1` used for fmt.Sprintf format parameter"
-	fmt.Sprintf((v1 + c1))    // want "non-constant expression used for fmt.Sprintf format parameter"
-	fmt.Sprintf(ar[0])        // want "variable `ar.0.` used for fmt.Sprintf format parameter"
-	fmt.Sprintf(*pv1)         // want "variable `.pv1` used for fmt.Sprintf format parameter"
-	fmt.Sprintf(v3[:2])       // want "variable `v3` used for fmt.Sprintf format parameter"
-	fmt.Sprintf(v3[2:])       // want "variable `v3` used for fmt.Sprintf format parameter"
-	fmt.Sprintf(v3[0:2])      // want "variable `v3` used for fmt.Sprintf format parameter"
+	passthrough(v1 + v2)      // want "variable `v1 \\+ v2` used for passthrough format parameter"
+	fmt.Sprintf(v1 + v2 + v3) // want "variable `v1 \\+ v2 \\+ v3` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(v1 + c1)      // want "variable `v1 \\+ c1` used for fmt.Sprintf format parameter"
+	fmt.Sprintf((v1 + c1))    // want "variable `\\(v1 \\+ c1\\)` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(ar[0])        // want "variable `ar\\[0\\]` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(*pv1)         // want "variable `\\*pv1` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(v3[:2])       // want "variable `v3\\[:2\\]` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(v3[2:])       // want "variable `v3\\[2:\\]` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(v3[0:2])      // want "variable `v3\\[0:2\\]` used for fmt.Sprintf format parameter"
 	fmt.Sprintf(pkg.V)        // want "variable `pkg.V` used for fmt.Sprintf format parameter"
 	lv := "lv"
+	fmt.Sprintf(lv)
+	if len(os.Args) > 2 {
+		lv = "lv2"
+	}
+	// TODO:should we accept conditional between two constant values?
 	fmt.Sprintf(lv) // want "variable `lv` used for fmt.Sprintf format parameter"
 	lookup := map[bool]string{false: "false", true: "true"}
-	fmt.Sprintf(lookup[false])                                        // want "variable `lookup.false.` used for fmt.Sprintf format parameter"
+	fmt.Sprintf(lookup[false]) // want "variable `lookup\\[false\\]` used for fmt.Sprintf format parameter"
+	// long literals are replaced with 'non-constant expression'
 	fmt.Sprintf(map[bool]string{false: "false", true: "true"}[false]) // want "non-constant expression used for fmt.Sprintf format parameter"
-	complicated(v1, v2, v3)                                           // want "variable `v3` used for complicated format parameter"
-	fmt.Fprintf(os.Stdout, os.Args[0])                                // want "variable `os.Args.0.` used for fmt.Fprintf format parameter"
+
+	complicated(v1, v2, v3)            // want "variable `v3` used for complicated format parameter"
+	fmt.Fprintf(os.Stdout, os.Args[0]) // want "variable `os\\.Args\\[0\\]` used for fmt.Fprintf format parameter"
 }
 
 func goodf(format string, args ...interface{}) {
@@ -73,9 +78,11 @@ func passthrough(format string, args ...interface{}) {
 }
 
 func modifiedpassthrough(format string, args ...interface{}) {
-	fmt.Sprintf(format, args...)
-	format = "blah"
-	// but not after they modify the format
+	fmt.Sprintf(format, args...) // don't warn for passthrough format strings
+	format = c1
+	fmt.Sprintf(format, args...) // nor if set to a new constant
+	format = v1
+	// but do warn if modified to a variable
 	fmt.Sprintf(format, args...) // want "variable `format` used for fmt.Sprintf format parameter"
 }
 
