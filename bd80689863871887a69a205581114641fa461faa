@@ -1,0 +1,13 @@
+all:
+mutility/variable-format 126 109
+mod:
+github.com/mutility/variable-format 126 109
+root:
+github.com/mutility/variable-format 2 0
+github.com/mutility/variable-format/varfmt 124 109
+pkg:
+github.com/mutility/variable-format 2 0
+github.com/mutility/variable-format/varfmt 124 109
+file:
+github.com/mutility/variable-format/main.go 2 0
+github.com/mutility/variable-format/varfmt/varfmt.go 124 109
