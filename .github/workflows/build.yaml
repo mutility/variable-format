@@ -1,37 +1,31 @@
 name: CI
 
-# Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
   push:
     branches:
-    - main
+      - main
   pull_request:
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches:
+      - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  test:
+    uses: mutility/ci/.github/workflows/go-test.yaml@main
+    with:
+      show-coverage: file
+      go-version: stable
 
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version: 'stable'
-
-      - name: test
-        run: go test ./...
-
-      - id: coverpkg
-        name: Calculate Coverage
-        uses: mutility/coverpkg@v1
-        with:
-          token: ${{ github.token }}
-          groupby: file
-          comment: replace
+  publish:
+    permissions:
+      contents: write
+      pull-requests: write
+    needs: test
+    if: always() && (needs.test.result == 'success')
+    uses: mutility/ci/.github/workflows/go-test-publish.yaml@main
+    with:
+      go-version: stable
